@@ -86,7 +86,35 @@ TX and RX share EN. Receive-only operation can therefore raise TX underrun; enab
 
 Compile `i2s_clkgen.sv`, `i2s_core.sv`, `apb4_i2s.sv`, and `cmsdk_apb_i2s.sv` with SystemVerilog interface support and `rtl/` on the include path. Compile the `apb4_if` interface definition before modules that use it.
 
-This folder is not a standalone build. Supply compatible external dependencies: `apb4_if.sv`, `register.sv` (`dffr`, `dffer`), `fifo.sv`, `edge_det.sv` (`edge_det_sync_re`), and `cdc_sync`. The testbench in `tb/` also requires external pad models and test infrastructure. Validate bridge decoding, error propagation, FIFO handling, interrupts, and audio timing in the integrated SoC. Direct instantiation of `apb4_i2s` uses different defaults (`STRICT_APB = 0`, `LEVEL_IRQ = 0`); this README describes the wrapper configuration.
+The shared RTL dependencies are provided in `common/`; the required Vivado files are listed below. The testbench in `tb/` also requires pad models and test infrastructure. Validate bridge decoding, error propagation, FIFO handling, interrupts, and audio timing in the integrated SoC. Direct instantiation of `apb4_i2s` uses different defaults (`STRICT_APB = 0`, `LEVEL_IRQ = 0`); this README describes the wrapper configuration.
+
+### Vivado: Required Files from `common/`
+
+Paths below are relative to this project folder.
+
+| File | Purpose | Vivado handling |
+|---|---|---|
+| `common/rtl/interface/apb4_if.sv` | APB4 interface definition | Add to **Design Sources** as SystemVerilog; compile before the I2S modules |
+| `common/rtl/cdc/cdc_sync.sv` | External clock input synchronizer | Add to **Design Sources** as SystemVerilog |
+| `common/rtl/utils/register.sv` | Register primitives (`dffr`, `dffer`) | Include-only; already included by `apb4_i2s.sv` |
+| `common/rtl/utils/fifo.sv` | TX/RX FIFO implementation | Include-only; already included by `apb4_i2s.sv` |
+| `common/rtl/utils/edge_det.sv` | Serial clock edge detector | Include-only; already included by `i2s_core.sv` |
+| `common/rtl/config.svh` | Shared configuration header | Include-only; included by `register.sv` |
+| `common/rtl/utils/xchecker.sv` | Assertions used by some register primitives | Add as a SystemVerilog source when those primitives are elaborated with assertions enabled; not required by the I2S `dffr`/`dffer` instances |
+
+Add the four I2S module files listed above to **Design Sources** as SystemVerilog. Keep `rtl/i2s_define.sv` available as an include-only file. In **Settings > General > Verilog options > Include directories**, add:
+
+```text
+rtl/
+common/rtl/
+common/rtl/utils/
+common/rtl/interface/
+common/rtl/cdc/
+```
+
+Resolve these paths from the project source folder, or use absolute paths if the Vivado project is stored elsewhere. Apply the same include directories to the simulation fileset when running simulation.
+
+For include-only files, make them available through the include directories and avoid compiling them again as independent design sources: `register.sv`, `fifo.sv`, and `edge_det.sv` contain module definitions without include guards. Do not mark them as global includes. Use `cmsdk_apb_i2s` as the top for standalone peripheral elaboration, or instantiate it under the SoC top and update the compile order. `common/rtl/tech/gpio_pad.sv` is used by the supplied pad-based testbench; it is not required for the flat wrapper's synthesis.
 
 ## License
 
